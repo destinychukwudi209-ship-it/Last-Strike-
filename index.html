@@ -1,0 +1,281 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#101820">
+<title>Last Strike 3D</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:#101820;color:white;font-family:Arial;touch-action:none}
+canvas{display:block}
+#hud{position:fixed;inset:0;pointer-events:none}
+.panel{background:#101820d9;padding:10px 14px;border:1px solid #ffffff35;border-radius:10px}
+#top{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;gap:8px}
+#health{color:#62ff8c}
+#status{font-size:12px;color:#ffd36a;margin-top:5px}
+#message{position:absolute;top:75px;left:50%;transform:translateX(-50%);background:#101820cc;padding:9px;border-radius:8px;font-size:13px;white-space:nowrap}
+#joy{position:absolute;bottom:22px;left:22px;width:125px;height:125px;border-radius:50%;border:2px solid #ffffff70;background:#ffffff20;pointer-events:auto;touch-action:none}
+#stick{position:absolute;width:48px;height:48px;border-radius:50%;background:#ffffffb8;left:36px;top:36px}
+#look{position:absolute;right:0;top:110px;width:58%;height:50%;pointer-events:auto;touch-action:none}
+#fire{position:absolute;right:23px;bottom:28px;width:84px;height:84px;border-radius:50%;border:3px solid white;background:#e53935e8;color:white;font-weight:bold;font-size:17px;pointer-events:auto;touch-action:none}
+#start{position:fixed;inset:0;z-index:5;background:#10231d;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}
+#start button{border:0;border-radius:12px;padding:15px 28px;background:#ffb52e;color:#18202a;font-weight:bold;font-size:18px}
+#hint{font-size:12px;color:#c6d3df}
+#aim{position:absolute;left:50%;top:50%;width:12px;height:12px;transform:translate(-50%,-50%);border:1px solid white;border-radius:50%}
+</style>
+</head>
+<body>
+<div id="start">
+ <div>
+  <h1>LAST STRIKE 3D</h1>
+  <p>Survive the arena. Eliminate every enemy.</p>
+  <p id="hint">Landscape gameplay · Mobile controls</p>
+  <button id="play">START GAME</button>
+  <p id="orient" style="font-size:12px;color:#b7c9d4">For the best view, turn your phone sideways.</p>
+ </div>
+</div>
+<div id="hud">
+ <div id="top">
+  <div class="panel"><b>LAST STRIKE 3D</b><div id="status">Practice mode</div></div>
+  <div class="panel">HP: <b id="hp">100</b><br>Enemies: <b id="left">6</b><br>Score: <b id="score">0</b></div>
+ </div>
+ <div id="message">Eliminate all enemies!</div>
+ <div id="aim"></div>
+ <div id="joy"><div id="stick"></div></div>
+ <div id="look"></div>
+ <button id="fire">FIRE</button>
+</div>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from "three";
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x91c9ef);
+scene.fog = new THREE.Fog(0x91c9ef,45,130);
+
+const camera = new THREE.PerspectiveCamera(68,innerWidth/innerHeight,.1,250);
+const renderer = new THREE.WebGLRenderer({antialias:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+renderer.setSize(innerWidth,innerHeight);
+renderer.domElement.style.position="fixed";
+renderer.domElement.style.inset="0";
+renderer.domElement.style.zIndex="0";
+document.body.prepend(renderer.domElement);
+document.querySelector("#hud").style.zIndex="1";
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x60754a,2));
+const sun=new THREE.DirectionalLight(0xffffff,2);
+sun.position.set(15,30,10);
+scene.add(sun);
+
+function mat(color){return new THREE.MeshStandardMaterial({color})}
+function cube(x,y,z,w,h,d,color){
+ const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color));
+ o.position.set(x,y,z);scene.add(o);return o;
+}
+
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(180,180),mat(0x57964b));
+ground.rotation.x=-Math.PI/2;scene.add(ground);
+
+// Arena walls
+cube(0,2,-82,165,4,2,0x626b71);
+cube(0,2,82,165,4,2,0x626b71);
+cube(-82,2,0,2,4,165,0x626b71);
+cube(82,2,0,2,4,165,0x626b71);
+
+// Buildings and cover
+for(let i=0;i<20;i++){
+ const x=(Math.random()-.5)*100,z=(Math.random()-.5)*100;
+ if(Math.abs(x)<10&&Math.abs(z)<10)continue;
+ const w=3+Math.random()*4,d=3+Math.random()*4;
+ cube(x,1.3,z,w,2.6,d,0x9b8060);
+ cube(x,2.75,z,w+.3,.3,d+.3,0x51473f);
+}
+for(let i=0;i<35;i++){
+ const x=(Math.random()-.5)*120,z=(Math.random()-.5)*120;
+ if(Math.abs(x)<10&&Math.abs(z)<10)continue;
+ cube(x,.8,z,.4,1.6,.4,0x65452a);
+ const crown=new THREE.Mesh(new THREE.ConeGeometry(1.8,4,6),mat(0x236b38));
+ crown.position.set(x,3,z);scene.add(crown);
+}
+
+// Player character
+const player=new THREE.Group();scene.add(player);
+const body=new THREE.Mesh(new THREE.CapsuleGeometry(.43,.85,4,8),mat(0x2476db));
+body.position.y=1.15;player.add(body);
+const head=new THREE.Mesh(new THREE.SphereGeometry(.29,10,8),mat(0xe5b68b));
+head.position.y=1.95;player.add(head);
+const gun=new THREE.Mesh(new THREE.BoxGeometry(.16,.16,.85),mat(0x25282b));
+gun.position.set(.35,1.4,-.55);player.add(gun);
+
+const enemies=[];
+for(let i=0;i<6;i++){
+ const obj=new THREE.Group();
+ const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.42,.7,3,7),mat(0xd44832));
+ torso.position.y=1;obj.add(torso);
+ const h=new THREE.Mesh(new THREE.SphereGeometry(.27,8,6),mat(0xf0c18d));
+ h.position.y=1.8;obj.add(h);
+ let x,z;
+ do{x=(Math.random()-.5)*48;z=-12-Math.random()*38}
+ while(Math.hypot(x,z)<9);
+ obj.position.set(x,0,z);
+ scene.add(obj);
+ enemies.push({obj,hp:100,alive:true,cooldown:Math.random()*2});
+}
+
+let yaw=0,pitch=.12,hp=100,score=0;
+let moveX=0,moveY=0,playing=false,ended=false;
+const hpEl=document.querySelector("#hp");
+const leftEl=document.querySelector("#left");
+const scoreEl=document.querySelector("#score");
+const message=document.querySelector("#message");
+const status=document.querySelector("#status");
+function say(s){message.textContent=s}
+
+function updateCamera(){
+ const target=new THREE.Vector3(player.position.x,1.45,player.position.z);
+ const dir=new THREE.Vector3(
+  Math.sin(yaw)*Math.cos(pitch),
+  Math.sin(pitch),
+  Math.cos(yaw)*Math.cos(pitch)
+ );
+ camera.position.copy(target).addScaledVector(dir,6.5);
+ camera.lookAt(target);
+}
+
+const raycaster=new THREE.Raycaster();
+function shoot(){
+ if(!playing||ended)return;
+ raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
+ const live=enemies.filter(e=>e.alive);
+ const hits=raycaster.intersectObjects(live.flatMap(e=>e.obj.children),false);
+ if(hits.length){
+  const enemy=live.find(e=>e.obj===hits[0].object.parent||e.obj.children.includes(hits[0].object));
+  if(enemy){
+   enemy.hp-=50;
+   enemy.obj.traverse(o=>{if(o.material&&o.material.color)o.material.color.set(0xffd34d)});
+   if(enemy.hp<=0){
+    enemy.alive=false;scene.remove(enemy.obj);score+=100;
+    scoreEl.textContent=score;
+    leftEl.textContent=enemies.filter(e=>e.alive).length;
+    if(!enemies.some(e=>e.alive)){ended=true;say("VICTORY! Arena cleared!")}
+    else say("Enemy eliminated!");
+   }else say("Hit! Keep firing!");
+   return;
+  }
+ }
+ say("Missed! Aim at an enemy.");
+}
+
+document.querySelector("#fire").addEventListener("pointerdown",e=>{
+ e.preventDefault();shoot();
+});
+
+// Joystick
+const joy=document.querySelector("#joy"),stick=document.querySelector("#stick");
+let joyId=null;
+function joyMove(e){
+ const r=joy.getBoundingClientRect();
+ let dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2);
+ const len=Math.hypot(dx,dy),max=43;
+ if(len>max){dx=dx/len*max;dy=dy/len*max}
+ moveX=dx/max;moveY=dy/max;
+ stick.style.left=36+dx+"px";stick.style.top=36+dy+"px";
+}
+function joyEnd(){
+ joyId=null;moveX=0;moveY=0;
+ stick.style.left="36px";stick.style.top="36px";
+}
+joy.addEventListener("pointerdown",e=>{
+ joyId=e.pointerId;joy.setPointerCapture(e.pointerId);joyMove(e);
+});
+joy.addEventListener("pointermove",e=>{if(e.pointerId===joyId)joyMove(e)});
+joy.addEventListener("pointerup",joyEnd);
+joy.addEventListener("pointercancel",joyEnd);
+
+// Drag on the right side to aim
+const look=document.querySelector("#look");
+let lookId=null,lastX=0,lastY=0;
+look.addEventListener("pointerdown",e=>{
+ lookId=e.pointerId;lastX=e.clientX;lastY=e.clientY;
+ look.setPointerCapture(e.pointerId);
+});
+look.addEventListener("pointermove",e=>{
+ if(e.pointerId!==lookId)return;
+ yaw-=(e.clientX-lastX)*.008;
+ pitch=THREE.MathUtils.clamp(pitch-(e.clientY-lastY)*.003,-.45,.65);
+ lastX=e.clientX;lastY=e.clientY;
+});
+look.addEventListener("pointerup",()=>lookId=null);
+look.addEventListener("pointercancel",()=>lookId=null);
+
+addEventListener("keydown",e=>{
+ if(e.key==="w"||e.key==="ArrowUp")moveY=-1;
+ if(e.key==="s"||e.key==="ArrowDown")moveY=1;
+ if(e.key==="a"||e.key==="ArrowLeft")moveX=-1;
+ if(e.key==="d"||e.key==="ArrowRight")moveX=1;
+ if(e.key===" ")shoot();
+});
+addEventListener("keyup",e=>{
+ if(["w","s","ArrowUp","ArrowDown"].includes(e.key))moveY=0;
+ if(["a","d","ArrowLeft","ArrowRight"].includes(e.key))moveX=0;
+});
+
+function animate(){
+ requestAnimationFrame(animate);
+ if(playing&&!ended){
+  const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));
+  const right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
+  player.position.addScaledVector(forward,-moveY*.14);
+  player.position.addScaledVector(right,moveX*.14);
+  player.position.x=THREE.MathUtils.clamp(player.position.x,-78,78);
+  player.position.z=THREE.MathUtils.clamp(player.position.z,-78,78);
+  player.rotation.y=yaw;
+  // Simple practice enemies move toward the player
+  for(const e of enemies){
+   if(!e.alive)continue;
+   const dx=player.position.x-e.obj.position.x;
+   const dz=player.position.z-e.obj.position.z;
+   const dist=Math.hypot(dx,dz);
+   if(dist>5){
+    e.obj.position.x+=dx/dist*.018;
+    e.obj.position.z+=dz/dist*.018;
+   }else{
+    e.cooldown-=.016;
+    if(e.cooldown<=0){
+     hp=Math.max(0,hp-5);hpEl.textContent=hp;
+     e.cooldown=1.5;
+     say("You're taking damage!");
+     if(hp<=0){ended=true;say("ELIMINATED! Refresh to retry.");}
+    }
+   }
+  }
+ }
+ updateCamera();
+ renderer.render(scene,camera);
+}
+animate();
+
+document.querySelector("#play").addEventListener("click",async()=>{
+ try{
+  if(screen.orientation?.lock)await screen.orientation.lock("landscape");
+ }catch(e){}
+ document.querySelector("#start").style.display="none";
+ playing=true;
+ status.textContent="Offline practice";
+ say("Survive and eliminate every enemy!");
+});
+
+addEventListener("resize",()=>{
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+  </html>
+    
